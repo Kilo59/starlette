@@ -9,14 +9,17 @@ import types
 import typing
 from urllib.parse import unquote, urljoin, urlsplit
 
-import requests
+try:
+    import httpx as r
+except ImportError:
+    import  requests as r
 
 from starlette.types import Message, Receive, Scope, Send
 from starlette.websockets import WebSocketDisconnect
 
 # Annotations for `Session.request()`
 Cookies = typing.Union[
-    typing.MutableMapping[str, str], requests.cookies.RequestsCookieJar
+    typing.MutableMapping[str, str], r.cookies.rCookieJar
 ]
 Params = typing.Union[bytes, typing.MutableMapping[str, str]]
 DataType = typing.Union[bytes, typing.MutableMapping[str, str], typing.IO]
@@ -24,8 +27,8 @@ TimeOut = typing.Union[float, typing.Tuple[float, float]]
 FileType = typing.MutableMapping[str, typing.IO]
 AuthType = typing.Union[
     typing.Tuple[str, str],
-    requests.auth.AuthBase,
-    typing.Callable[[requests.Request], requests.Request],
+    r.auth.AuthBase,
+    typing.Callable[[r.Request], r.Request],
 ]
 
 
@@ -34,7 +37,7 @@ ASGI2App = typing.Callable[[Scope], ASGIInstance]
 ASGI3App = typing.Callable[[Scope, Receive, Send], typing.Awaitable[None]]
 
 
-class _HeaderDict(requests.packages.urllib3._collections.HTTPHeaderDict):
+class _HeaderDict(r.packages.urllib3._collections.HTTPHeaderDict):
     def get_all(self, key: str, default: str) -> str:
         return self.getheaders(key)
 
@@ -87,7 +90,7 @@ class _WrapASGI2:
         await instance(receive, send)
 
 
-class _ASGIAdapter(requests.adapters.HTTPAdapter):
+class _ASGIAdapter(r.adapters.HTTPAdapter):
     def __init__(
         self, app: ASGI3App, raise_server_exceptions: bool = True, root_path: str = ""
     ) -> None:
@@ -96,8 +99,8 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
         self.root_path = root_path
 
     def send(
-        self, request: requests.PreparedRequest, *args: typing.Any, **kwargs: typing.Any
-    ) -> requests.Response:
+        self, request: r.PreparedRequest, *args: typing.Any, **kwargs: typing.Any
+    ) -> r.Response:
         scheme, netloc, path, query, fragment = (
             str(item) for item in urlsplit(request.url)
         )
@@ -255,7 +258,7 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
                 "body": io.BytesIO(),
             }
 
-        raw = requests.packages.urllib3.HTTPResponse(**raw_kwargs)
+        raw = r.packages.urllib3.HTTPResponse(**raw_kwargs)
         response = self.build_response(request, raw)
         if template is not None:
             response.template = template
@@ -360,7 +363,7 @@ class WebSocketTestSession:
         return json.loads(text)
 
 
-class TestClient(requests.Session):
+class TestClient(r.Session):
     __test__ = False  # For pytest to not discover this up.
 
     def __init__(
@@ -408,7 +411,7 @@ class TestClient(requests.Session):
         verify: typing.Union[bool, str] = None,
         cert: typing.Union[str, typing.Tuple[str, str]] = None,
         json: typing.Any = None,
-    ) -> requests.Response:
+    ) -> r.Response:
         url = urljoin(self.base_url, url)
         return super().request(
             method,
